@@ -52,9 +52,6 @@ function sendToMQ(mqMessage) {
             ch.assertQueue(q, {durable: false});
             // Note: on Node 6 Buffer.from(msg) should be used
             ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
-            // ch.sendToQueue(q, new Buffer.from(JSON.stringify(coords[0])));
-            // ch.sendToQueue(q, new Buffer('hi'));
-            console.log(" [x] Sent 'Hello World!'");
         });
     });
 }
@@ -84,7 +81,6 @@ function generateRoutes(amount) {
         return route;
     });
     getRoutesFromOSRM(coordList);
-    // return coordList;
 }
 
 function getRoutesFromOSRM(coords){
@@ -102,10 +98,10 @@ function getRoutesFromOSRM(coords){
                     let steps = _.map(value['routes'][0]['legs'][0]['steps'], (step) => {
                         return step.maneuver.location;
                     });
+
                     let routeObject = {};
                     routeObject.cartrackerId = randomIntFromInterval(1, 50);
                     routeObject.route = steps;
-                    myRoutes.push(steps);
                     routeObjectArray.push(routeObject);
                     resolve();
                 }
