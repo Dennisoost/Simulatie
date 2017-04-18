@@ -11,6 +11,8 @@ let operations = [];
 let myRoutes = [];
 let routeObjectArray = [];
 
+console.log(process.env.MQ_HOST)
+console.log('====================')
 generateRoutes(amountOfRoutes);
 
 Promise.all(operations).then(() => {
@@ -45,7 +47,7 @@ Promise.all(operations).then(() => {
 });
 
 function sendToMQ(mqMessage) {
-    amqp.connect('amqp://localhost', function(err, conn) {
+    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
         conn.createChannel(function(err, ch) {
             let q = 'hello';
 

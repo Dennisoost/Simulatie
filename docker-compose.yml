@@ -1,0 +1,10 @@
+version: '2'
+services:
+  my-app:
+    build: .
+    links:
+      - my-mq
+    environment:
+      MQ_HOST: my-mq
+  my-mq:
+    image: rabbitmq
