@@ -13,13 +13,6 @@ let routeObjectArray = [];
 
 console.log(process.env.MQ_HOST)
 console.log('====================')
-var channel;
-
-amqp.connect('amqp://localhost', function(err, conn) {
-     channel = conn.createChannel(function(err, ch) {
-    });
-});
-
 generateRoutes(amountOfRoutes);
 
 Promise.all(operations).then(() => {
@@ -54,11 +47,15 @@ Promise.all(operations).then(() => {
 });
 
 function sendToMQ(mqMessage) {
-    let q = 'hello';
+    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
+        conn.createChannel(function(err, ch) {
+            let q = 'hello';
 
-    channel.assertQueue(q, {durable: false});
-    // Note: on Node 6 Buffer.from(msg) should be used
-    channel.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
+            ch.assertQueue(q, {durable: false});
+            // Note: on Node 6 Buffer.from(msg) should be used
+            ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
+        });
+    });
 }
 
 function generateRoutes(amount) {
