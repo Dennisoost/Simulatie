@@ -54,6 +54,7 @@ function sendToMQ(mqMessage) {
             ch.assertQueue(q, {durable: false});
             // Note: on Node 6 Buffer.from(msg) should be used
             ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
+            conn.close();
         });
     });
 }
