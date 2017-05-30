@@ -2,17 +2,26 @@ const coordinates = require('./coords.json');
 const _ = require('lodash');
 const request = require('request');
 const amqp = require('amqplib/callback_api');
+const WebSocket = require('ws');
 
 const minutes = 0.1;
 const interval = minutes * 60 * 1000;
 
 let amountOfRoutes = 50;
 let operations = [];
-let myRoutes = [];
 let routeObjectArray = [];
 
-console.log(process.env.MQ_HOST)
-console.log('====================')
+let missedWaypoints = [];
+
+const wss = new WebSocket.Server({ port: 8080 });
+let conn;
+
+wss.on('connection', function connection(ws) {
+    conn = ws;
+    ws.send('connected');
+});
+
+console.log(process.env.MQ_HOST);
 generateRoutes(amountOfRoutes);
 
 Promise.all(operations).then(() => {
@@ -23,12 +32,17 @@ Promise.all(operations).then(() => {
             var date = new Date();
             let waypoint = {};
             waypoint.cartracker = routeObject.cartrackerId;
-            waypoint.lat = routeObject.route[0][0];
-            waypoint.lon = routeObject.route[0][1];
+            waypoint.lat = routeObject.route[0][1];
+            waypoint.lon = routeObject.route[0][0];
             waypoint.date = date;
             console.log(waypoint);
             // send message, wait for message to be sent
             sendToMQ(waypoint);
+            conn.send(JSON.stringify(waypoint));
+            if(missedWaypoints.length > 0) {
+                console.log(missedWaypoints);
+                sendMissedToMQ();
+            }
             // Check if route has atleast 2 waypoints
             // Else remove the route from the routes array
             if(routeObject.route.length >= 2) {
@@ -46,16 +60,50 @@ Promise.all(operations).then(() => {
     }, interval);
 });
 
-function sendToMQ(mqMessage) {
-    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
+function sendMissedToMQ() {
+    amqp.connect('amqp://localhost', function(err, conn) {
         conn.createChannel(function(err, ch) {
             let q = 'hello';
 
             ch.assertQueue(q, {durable: false});
             // Note: on Node 6 Buffer.from(msg) should be used
-            ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
+            ch.sendToQueue(q, new Buffer.from(JSON.stringify(missedWaypoints)));
+            //console.log(missedWaypoints);
+            ch.close();
+            missedWaypoints = [];
         });
     });
+}
+
+function sendToMQ(mqMessage) {
+    amqp.connect('amqp://localhost', function(err, conn) {
+        if(err) {
+            addMessageToMissed(mqMessage)
+        } else {
+            conn.createChannel(function(err, ch) {
+                if (err) {
+                   addMessageToMissed(mqMessage)
+                } else {
+                    let q = 'hello';
+
+                    ch.assertQueue(q, {durable: false});
+                    // Note: on Node 6 Buffer.from(msg) should be used
+                    ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
+                    ch.close();
+                }
+            });
+        }
+    });
+}
+
+function addMessageToMissed(mqMessage){
+    if (missedWaypoints[mqMessage.cartrackerId] == null) {
+        missedWaypoints[mqMessage.cartrackerId] = [mqMessage];
+    } else {
+        let previousMissedWaypoints = missedWaypoints[mqMessage.cartrackerId];
+        previousMissedWaypoints.push(mqMessage);
+        missedWaypoints[mqMessage.cartrackerId] = previousMissedWaypoints;
+    }
 }
 
 function generateRoutes(amount) {
@@ -104,6 +152,7 @@ function getRoutesFromOSRM(coords){
                     let routeObject = {};
                     routeObject.cartrackerId = randomIntFromInterval(1, 50);
                     routeObject.route = steps;
+                    routeObject.itemLength = steps.length; // TODO
                     routeObjectArray.push(routeObject);
                     resolve();
                 }
