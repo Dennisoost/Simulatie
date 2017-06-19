@@ -3,11 +3,15 @@ const _ = require('lodash');
 const request = require('request');
 const amqp = require('amqplib/callback_api');
 const WebSocket = require('ws');
+const polyline = require('polyline');
+const googleMaps = require('@google/maps').createClient({
+    key: 'AIzaSyDOWslX02PPEzo7772zCq-gZJboUvxT0fM'
+});
 
-const minutes = 0.1;
+const minutes = 0.03;
 const interval = minutes * 60 * 1000;
 
-let amountOfRoutes = 50;
+let amountOfRoutes = 20;
 let operations = [];
 let routeObjectArray = [];
 
@@ -21,38 +25,40 @@ wss.on('connection', function connection(ws) {
     ws.send('connected');
 });
 
+
 console.log(process.env.MQ_HOST);
 generateRoutes(amountOfRoutes);
 
 Promise.all(operations).then(() => {
     setInterval(() => {
         let removeFromRoutes = [];
-
         _.forEach(routeObjectArray, (routeObject, index) => {
             var date = new Date();
             let waypoint = {};
             waypoint.cartracker = routeObject.cartrackerId;
-            waypoint.lat = routeObject.route[0][1];
-            waypoint.lon = routeObject.route[0][0];
+            console.log(routeObject.route[0]);
+            waypoint.lat = routeObject.route[0].lat;
+            waypoint.lon = routeObject.route[0].lng;
             waypoint.date = date;
-            console.log(waypoint);
-            // send message, wait for message to be sent
+
             sendToMQ(waypoint);
-            conn.send(JSON.stringify(waypoint));
-            if(missedWaypoints.length > 0) {
+            if (conn !== undefined) {
+                conn.send(JSON.stringify(waypoint));
+            }
+            if (missedWaypoints.length > 0) {
                 console.log(missedWaypoints);
                 sendMissedToMQ();
             }
+
             // Check if route has atleast 2 waypoints
             // Else remove the route from the routes array
-            if(routeObject.route.length >= 2) {
-                routeObject.route.pop();
+            if (routeObject.route.length >= 2) {
+                routeObject.route.splice(0, 1)
             } else {
                 removeFromRoutes.push(index);
             }
         });
-        _.forEach(removeFromRoutes, (routeIndex) =>
-        {
+        _.forEach(removeFromRoutes, (routeIndex) => {
             routeObjectArray.splice(routeIndex, 1);
             generateRoutes(1);
         });
@@ -65,7 +71,7 @@ function sendMissedToMQ() {
         conn.createChannel(function(err, ch) {
             let q = 'hello';
 
-            ch.assertQueue(q, {durable: false});
+            ch.assertQueue(q, { durable: false });
             // Note: on Node 6 Buffer.from(msg) should be used
             ch.sendToQueue(q, new Buffer.from(JSON.stringify(missedWaypoints)));
             //console.log(missedWaypoints);
@@ -77,16 +83,16 @@ function sendMissedToMQ() {
 
 function sendToMQ(mqMessage) {
     amqp.connect('amqp://localhost', function(err, conn) {
-        if(err) {
+        if (err) {
             addMessageToMissed(mqMessage)
         } else {
             conn.createChannel(function(err, ch) {
                 if (err) {
-                   addMessageToMissed(mqMessage)
+                    addMessageToMissed(mqMessage)
                 } else {
                     let q = 'hello';
 
-                    ch.assertQueue(q, {durable: false});
+                    ch.assertQueue(q, { durable: false });
                     // Note: on Node 6 Buffer.from(msg) should be used
                     ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
                     ch.close();
@@ -96,7 +102,7 @@ function sendToMQ(mqMessage) {
     });
 }
 
-function addMessageToMissed(mqMessage){
+function addMessageToMissed(mqMessage) {
     if (missedWaypoints[mqMessage.cartrackerId] == null) {
         missedWaypoints[mqMessage.cartrackerId] = [mqMessage];
     } else {
@@ -121,50 +127,81 @@ function generateRoutes(amount) {
         };
 
         // Pick random beginpoint
-        route.beginpoint = coordinates[keys [keys.length * Math.random() << 0]];
+        route.beginpoint = coordinates[keys[keys.length * Math.random() << 0]];
 
         // Pick random endpoint that's different from the beginpoint
         while (route.beginpoint === route.endpoint || route.endpoint === "") {
-            route.endpoint = coordinates[keys [keys.length * Math.random() << 0]];
+            route.endpoint = coordinates[keys[keys.length * Math.random() << 0]];
         }
 
         return route;
     });
-    getRoutesFromOSRM(coordList);
+    getRoutesFromGooglemaps(coordList);
 }
 
-function getRoutesFromOSRM(coords){
+function getRoutesFromOSRM(coords) {
     coords.forEach((route) => {
         operations.push(new Promise((resolve, reject) => {
-            request.get('http://router.project-osrm.org/route/v1/driving/'
-                + route.beginpoint
-                +';' + route.endpoint
-                + '?overview=false&steps=true', (error, response, body) => {
-                if(error) {
-                    reject(error);
-                } else {
-                    let value = JSON.parse(body);
+            request.get('http://router.project-osrm.org/route/v1/driving/' +
+                route.beginpoint +
+                ';' + route.endpoint +
+                '?overview=false&steps=true', (error, response, body) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        let value = JSON.parse(body);
 
-                    let steps = _.map(value['routes'][0]['legs'][0]['steps'], (step) => {
-                        return step.maneuver.location;
-                    });
+                        let steps = _.map(value['routes'][0]['legs'][0]['steps'], (step) => {
+                            return step.maneuver.location;
+                        });
 
-                    let routeObject = {};
-                    routeObject.cartrackerId = randomIntFromInterval(1, 50);
-                    routeObject.route = steps;
-                    routeObject.itemLength = steps.length; // TODO
-                    routeObjectArray.push(routeObject);
-                    resolve();
-                }
-            });
+                        let routeObject = {};
+                        routeObject.cartrackerId = randomIntFromInterval(1, 50);
+                        routeObject.route = steps;
+                        routeObject.itemLength = steps.length; // TODO
+                        routeObjectArray.push(routeObject);
+                        resolve();
+                    }
+                });
         }));
     });
 }
 
-function randomIntFromInterval(min,max) {
-    let randomCartrackerId = Math.floor(Math.random()*(max-min+1)+min);
+
+
+function getRoutesFromGooglemaps(coords) {
+    coords.forEach((route) => {
+        googleMaps.directions({
+            origin: route.beginpoint,
+            destination: route.endpoint,
+            language: 'en',
+            units: 'metric',
+            mode: 'driving'
+        }, function(err, response) {
+            console.log(err)
+            if (!err) {
+                let steps = [];
+                steps = polyline.decode(response.json.routes[0].overview_polyline.points);
+                steps = _.map(steps, function(step) {
+                    return { lat: step[0], lng: step[1] };
+                })
+
+                let routeObject = {};
+                routeObject.cartrackerId = randomIntFromInterval(1, 50);
+                routeObject.route = steps;
+                routeObject.itemLength = steps.length;
+                routeObjectArray.push(routeObject);
+                resolve();
+            }
+        })
+    });
+}
+
+
+function randomIntFromInterval(min, max) {
+    let randomCartrackerId = Math.floor(Math.random() * (max - min + 1) + min);
     while (checkIfCartrackerIdExists(randomCartrackerId)) {
-        randomCartrackerId = Math.floor(Math.random()*(max-min+1)+min);
+        randomCartrackerId = Math.floor(Math.random() * (max - min + 1) + min);
     }
     return randomCartrackerId;
 }
