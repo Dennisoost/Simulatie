@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/maps": "^0.4.1",
     "amqplib": "^0.5.1",
     "lodash": "^4.17.4",
     "polyline": "^0.2.0",

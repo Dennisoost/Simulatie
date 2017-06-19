@@ -16,6 +16,7 @@ let operations = [];
 let routeObjectArray = [];
 
 let missedWaypoints = [];
+let useOSRM = true;
 
 const wss = new WebSocket.Server({ port: 8080 });
 let conn;
@@ -148,12 +149,16 @@ function generateRoutes(amount) {
         while (route.beginpoint === route.endpoint || route.endpoint === "") {
             route.endpoint = coordinates[keys[keys.length * Math.random() << 0]];
         }
-
+	
+	if(useOSRM) {
+           route.beginpoint = route.beginpoint.split(',').reverse().join(',');
+           route.endpoint = route.endpoint.split(',').reverse().join(',');
+	}
         return route;
     });
-    getRoutesFromOSRM(coordList);
-    // getRoutesFromGooglemaps(coordList);
-}
+	if(useOSRM) { getRoutesFromOSRM(coordList); }
+	else { getRoutesFromGooglemaps(coordList); }
+    }
 
 // function getRoutesFromOSRM(coords) {
 //     coords.forEach((route) => {
@@ -190,12 +195,11 @@ function getRoutesFromOSRM(coords) {
             request.get('http://192.168.25.216:5000/route/v1/driving/' +
                 route.beginpoint +
                 ';' + route.endpoint +
-                '?overview=false&steps=true&overview=full', (error, response, body) => {
+                '?overview=full', (error, response, body) => {
                 if (error) {
                     reject(error);
                 } else {
                     let value = JSON.parse(body);
-
                     let steps = polyline.decode(value['routes'][0]['geometry']);
                     steps = _.map(steps, function(step) {
                         return { lat: step[0], lng: step[1] };
