@@ -18,7 +18,7 @@ let routeObjectArray = [];
 let missedWaypoints = [];
 let useOSRM = true;
 
-const wss = new WebSocket.Server({ port: 8080 });
+const wss = new WebSocket.Server({ port: 8081 });
 let conn;
 
 wss.on('connection', function connection(ws) {
