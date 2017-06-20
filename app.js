@@ -8,7 +8,7 @@ const googleMaps = require('@google/maps').createClient({
     key: 'AIzaSyDOWslX02PPEzo7772zCq-gZJboUvxT0fM'
 });
 
-const minutes = 0.20;
+const minutes = 0.05;
 const interval = minutes * 60 * 1000;
 
 let amountOfRoutes = 2;
