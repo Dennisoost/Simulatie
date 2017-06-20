@@ -98,7 +98,7 @@ function sendMissedToMQ() {
 }
 
 function sendToMQ(mqMessage) {
-    amqp.connect('amqp://a' + process.env.MQ_HOST, function(err, conn) {
+    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
         if (err) {
             console.log(err);
             addMessageToMissed(mqMessage)
