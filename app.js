@@ -83,7 +83,7 @@ function sendWaypoints () {
 }
 
 function sendMissedToMQ() {
-    amqp.connect('amqp://localhost', function(err, conn) {
+    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
         conn.createChannel(function(err, ch) {
             let q = 'hello';
 
@@ -98,7 +98,7 @@ function sendMissedToMQ() {
 }
 
 function sendToMQ(mqMessage) {
-    amqp.connect('amqp://localhost', function(err, conn) {
+    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
         if (err) {
             console.log(err);
             addMessageToMissed(mqMessage)
