@@ -100,6 +100,7 @@ function sendMissedToMQ() {
 function sendToMQ(mqMessage) {
     amqp.connect('amqp://localhost', function(err, conn) {
         if (err) {
+            console.log(err);
             addMessageToMissed(mqMessage)
         } else {
             conn.createChannel(function(err, ch) {
@@ -112,6 +113,7 @@ function sendToMQ(mqMessage) {
                     // Note: on Node 6 Buffer.from(msg) should be used
                     ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
                     ch.close();
+                    console.log('message is send')
                 }
             });
         }
