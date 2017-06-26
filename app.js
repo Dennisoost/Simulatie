@@ -36,6 +36,10 @@ wss.on('connection', function connection(ws) {
     });
 });
 
+var connection;
+amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
+    connection = conn;
+}
 
 console.log(process.env.MQ_HOST);
 generateRoutes(amountOfRoutes);
@@ -83,8 +87,7 @@ function sendWaypoints () {
 }
 
 function sendMissedToMQ() {
-    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
-        conn.createChannel(function(err, ch) {
+        connection.createChannel(function(err, ch) {
             let q = 'hello';
 
             ch.assertQueue(q, { durable: false });
@@ -95,16 +98,11 @@ function sendMissedToMQ() {
             missedWaypoints = [];
             conn.close();
         });
-    });
 }
 
 function sendToMQ(mqMessage) {
-    amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
-        if (err) {
-            console.log(err);
-            addMessageToMissed(mqMessage)
-        } else {
-            conn.createChannel(function(err, ch) {
+
+            connection.createChannel(function(err, ch) {
                 if (err) {
                     addMessageToMissed(mqMessage)
                 } else {
@@ -114,11 +112,9 @@ function sendToMQ(mqMessage) {
                     // Note: on Node 6 Buffer.from(msg) should be used
                     ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
                     ch.close();
-                    conn.close();
                 }
             });
-        }
-    });
+
 }
 
 function addMessageToMissed(mqMessage) {
