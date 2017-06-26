@@ -39,7 +39,7 @@ wss.on('connection', function connection(ws) {
 var connection;
 amqp.connect('amqp://' + process.env.MQ_HOST, function(err, conn) {
     connection = conn;
-}
+})
 
 console.log(process.env.MQ_HOST);
 generateRoutes(amountOfRoutes);
