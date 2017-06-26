@@ -93,6 +93,7 @@ function sendMissedToMQ() {
             //console.log(missedWaypoints);
             ch.close();
             missedWaypoints = [];
+            conn.close();
         });
     });
 }
@@ -113,7 +114,7 @@ function sendToMQ(mqMessage) {
                     // Note: on Node 6 Buffer.from(msg) should be used
                     ch.sendToQueue(q, new Buffer.from(JSON.stringify(mqMessage)));
                     ch.close();
-                    console.log('message is send')
+                    conn.close();
                 }
             });
         }
